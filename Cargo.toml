@@ -21,3 +21,8 @@ ratatui = "0.24.0"
 anyhow = "1.0"
 tui-textarea = "0.4.0"
 everything-sdk = "0.0.3"
+
+# https://blog.rust-lang.org/2020/03/15/docs-rs-opt-into-fewer-targets.html
+[package.metadata.docs.rs]
+default-target = "x86_64-pc-windows-msvc"
+targets = ["x86_64-pc-windows-msvc", "i686-pc-windows-msvc"]
