@@ -1,0 +1,23 @@
+[[bin]]
+name = "ery"
+
+[package]
+name = "ery"
+version = "0.0.1"
+authors = ["owtotwo <owtotwo@163.com>"]
+license = "GPL-3.0-or-later"
+edition = "2021"
+description = "Another Everything UI for Windows file searching, but in Terminal."
+readme = "README.md"
+repository = "https://github.com/owtotwo/ery-rs"
+homepage = "https://github.com/owtotwo/ery-rs"
+documentation = "https://docs.rs/ery"
+keywords = ["everything", "terminal", "tui", "cli", "command-line"]
+
+
+[dependencies]
+crossterm = "0.27.0"
+ratatui = "0.24.0"
+anyhow = "1.0"
+tui-textarea = "0.4.0"
+everything-sdk = "0.0.3"
