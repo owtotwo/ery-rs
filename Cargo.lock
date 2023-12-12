@@ -109,7 +109,7 @@ dependencies = [
 
 [[package]]
 name = "ery"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "anyhow",
  "crossterm",
@@ -120,9 +120,9 @@ dependencies = [
 
 [[package]]
 name = "everything-sdk"
-version = "0.0.3"
+version = "0.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c17ffb214d1287a7e2e6d9db254b2f70723673debb52fb26294bc69095d3642f"
+checksum = "12b22c804563019feaabe04cc90c8aaf47781cdb5399c95187fb394a80aa0059"
 dependencies = [
  "bitflags 2.4.1",
  "enum-primitive-derive",
