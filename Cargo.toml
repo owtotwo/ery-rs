@@ -3,7 +3,7 @@ name = "ery"
 
 [package]
 name = "ery"
-version = "0.0.2"
+version = "0.0.3"
 authors = ["owtotwo <owtotwo@163.com>"]
 license = "GPL-3.0-or-later"
 edition = "2021"
@@ -21,6 +21,7 @@ ratatui = "0.24.0"
 anyhow = "1.0"
 tui-textarea = "0.4.0"
 everything-sdk = "0.0.4"
+clap = { version = "4.4.11", features = ["derive"] }
 
 # https://blog.rust-lang.org/2020/03/15/docs-rs-opt-into-fewer-targets.html
 [package.metadata.docs.rs]

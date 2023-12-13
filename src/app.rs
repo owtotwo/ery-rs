@@ -92,6 +92,14 @@ impl App<'_> {
         self.is_running = false;
     }
 
+    /// Set the text in search bar by yank and paste
+    pub fn set_search_text(&mut self, text: &str) {
+        let old = self.textarea.yank_text();
+        self.textarea.set_yank_text(text);
+        self.textarea.paste();
+        self.textarea.set_yank_text(old);
+    }
+
     /// trigger the SendQuery event (Everything Searching) in the terminal.
     pub fn send_query(&mut self) {
         self.event_sender.send(Event::SendQuery).unwrap();
