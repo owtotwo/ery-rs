@@ -1,47 +1,39 @@
-use std::{sync::mpsc, thread};
+mod ery;
+
+use std::{sync::{mpsc, Mutex, Arc, RwLock}, thread};
 
 use everything_sdk::global;
-use tui_textarea::TextArea;
 
-use crate::{
-    ery::{item_to_entry, Query, QueryResults},
-    event::Event,
-};
+use crate::tui::Event;
+
+use self::ery::{item_to_entry, Query, QueryResults};
 
 #[derive(Debug)]
-pub struct App<'a> {
-    /// running state
-    pub is_running: bool,
+pub struct App {
     /// event sender
-    pub event_sender: mpsc::Sender<Event>,
-    /// Event handler thread for Everything-SDK.
-    pub query_handler: thread::JoinHandle<()>,
+    pub tui_sender: mpsc::Sender<Event>,
     /// query sender
     pub query_sender: mpsc::Sender<Query>,
+    /// send back the results when query done
+    pub back_recevier: Arc<Mutex<mpsc::Receiver<QueryResults>>>,
     /// query back results
-    pub query_results: QueryResults,
-    /// counter for temporary test
-    pub counter: u64,
-    /// tick count
-    pub tick: u32,
-    /// refresh count
-    pub refresh: u32,
-    /// search input
-    pub textarea: TextArea<'a>,
+    pub query_results: Arc<RwLock<QueryResults>>,
 }
 
-impl App<'_> {
-    pub fn with_sender(sender: mpsc::Sender<Event>) -> Self {
-        let (tx, rx) = mpsc::channel::<Query>();
-        let inner_sender = sender.clone();
-        let everything_handler = thread::spawn(move || {
+impl App {
+    pub fn with_sender(tui_sender: mpsc::Sender<Event>) -> Self {
+        let (tx_query, rx_query) = mpsc::channel::<Query>();
+        let query_sender = tx_query;
+        let (sync_tx_back, rx_back) = mpsc::sync_channel(0);
+        let back_recevier = Arc::new(Mutex::new(rx_back));
+        thread::spawn(move || {
             let mut everything = global().lock().unwrap();
             let mut searcher = everything.searcher();
-            while let Ok(query) = rx.recv() {
+            while let Ok(query) = rx_query.recv() {
                 if query.search.is_empty() {
                     // do not send IPC search, return empty result
                     let empty_result = QueryResults::default();
-                    inner_sender.send(Event::QueryBack(empty_result)).unwrap();
+                    sync_tx_back.send(empty_result).unwrap();
                 } else {
                     searcher
                         .set_search(query.search)
@@ -65,58 +57,44 @@ impl App<'_> {
                         sort_type: results.sort_type(),
                         entrys: entrys,
                     };
-                    inner_sender.send(Event::QueryBack(query_results)).unwrap();
+                    sync_tx_back.send(query_results).unwrap();
                 }
             }
         });
+
         Self {
-            is_running: true,
-            event_sender: sender,
-            query_handler: everything_handler,
-            query_sender: tx,
+            tui_sender,
+            query_sender,
+            back_recevier,
             query_results: Default::default(),
-            counter: 0,
-            tick: 0,
-            refresh: 0,
-            textarea: Default::default(),
         }
-    }
-
-    /// Handles the tick event of the terminal.
-    pub fn tick(&mut self) {
-        self.tick += 1;
-    }
-
-    /// Tell that the app is over.
-    pub fn quit(&mut self) {
-        self.is_running = false;
-    }
-
-    /// Set the text in search bar by yank and paste
-    pub fn set_search_text(&mut self, text: &str) {
-        let old = self.textarea.yank_text();
-        self.textarea.set_yank_text(text);
-        self.textarea.paste();
-        self.textarea.set_yank_text(old);
     }
 
     /// trigger the SendQuery event (Everything Searching) in the terminal.
-    pub fn send_query(&mut self) {
-        self.event_sender.send(Event::SendQuery).unwrap();
-    }
+    pub fn send_query(&mut self, query_text: &str) -> anyhow::Result<()> {
+        let query = Query {
+            search: query_text.to_owned(),
+            match_path: false,
+            match_case: false,
+            match_whole_word: false,
+            regex: false,
+            max: 64, // TODO: limit for now
+            offset: 0,
+            sort_type: Default::default(),
+            request_flags: Default::default(),
+        };
+        self.query_sender.send(query)?;
 
-    /// trigger Refresh Event to tui for new frame renderring (e.g. when app data updated)
-    pub fn refresh_now(&self) {
-        self.event_sender.send(Event::Refresh).unwrap();
-    }
-
-    pub fn increment_counter(&mut self) {
-        self.counter += 1;
-    }
-
-    pub fn decrement_counter(&mut self) {
-        if self.counter > 0 {
-            self.counter -= 1;
-        }
+        // then wait for the query results back
+        let rx = Arc::clone(&self.back_recevier);
+        let tui_tx = self.tui_sender.clone();
+        let results_in_app = Arc::clone(&self.query_results);
+        thread::spawn(move || {
+            if let Ok(results) = rx.lock().unwrap().recv() {
+                *results_in_app.write().unwrap() = results;
+                tui_tx.send(Event::Refresh).unwrap();
+            }
+        });
+        Ok(())
     }
 }
