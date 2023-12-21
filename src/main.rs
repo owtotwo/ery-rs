@@ -23,7 +23,7 @@ fn main() -> anyhow::Result<()> {
 
     let mut app = App::with_sender(tui.sender.clone());
     if let Some(text) = search_text {
-        tui.set_search_text(text);
+        tui.set_search_text(text); // set search text from start
         app.send_query(text)?; // then search it automatically
     }
 

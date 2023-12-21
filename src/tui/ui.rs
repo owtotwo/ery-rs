@@ -5,7 +5,7 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Paragraph},
     Frame,
 };
-use tui_textarea::{TextArea, CursorMove, Input, Key};
+use tui_textarea::{CursorMove, Input, Key, TextArea};
 
 use crate::app::App;
 
@@ -33,9 +33,11 @@ pub struct UI<'a> {
 
 impl UI<'_> {
     pub fn new() -> Self {
-        let mut textarea = TextArea::new(vec!["♿😊☺".to_string()]);
-        textarea.move_cursor(CursorMove::End);
-        UI { textarea }
+        // let mut textarea = TextArea::new(vec!["♿😊☺".to_string()]);
+        // textarea.move_cursor(CursorMove::End);
+        UI {
+            textarea: Default::default(),
+        }
     }
 
     pub fn render(&mut self, app: &mut App, frame: &mut Frame) {
@@ -114,7 +116,6 @@ impl UI<'_> {
         self.textarea.set_yank_text(old_yank);
     }
 }
-
 
 /// Custom key mappings for [`tui_textarea::TextArea`], enjoy an good typing for input.
 ///
