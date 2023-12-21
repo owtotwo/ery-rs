@@ -9,7 +9,9 @@ use crossterm::event::{KeyEvent, MouseEvent};
 use crossterm::terminal::{self, EnterAlternateScreen, LeaveAlternateScreen};
 use ratatui::backend::Backend;
 use ratatui::Terminal;
+use std::ffi::OsString;
 use std::panic;
+use std::str::FromStr;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 use std::{io, thread};
@@ -188,7 +190,12 @@ impl<B: Backend> Tui<'_, B> {
         match key_event.code {
             // Quit application on `Esc`
             KeyCode::Esc => {
-                self.quit();
+                if self.ui.is_focus_now {
+                    self.quit();
+                } else {
+                    app.unselect();
+                    self.ui.is_focus_now = true;
+                }
             }
             // Quit application on `Ctrl+C`
             KeyCode::Char('c') | KeyCode::Char('C')
@@ -198,14 +205,54 @@ impl<B: Backend> Tui<'_, B> {
             }
             // Do query on `Enter`
             KeyCode::Enter => {
-                app.send_query(self.ui.textarea.lines()[0].as_str())?;
+                if self.ui.is_focus_now {
+                    let s = self.ui.textarea.lines()[0].as_str();
+                    let is_query_already = if let Ok(results) = app.query_results.try_read() {
+                        results.search == OsString::from_str(s).unwrap()
+                    } else {
+                        false
+                    };
+                    if is_query_already {
+                        app.select_first();
+                        self.ui.is_focus_now = false;
+                    } else {
+                        app.send_query(s)?;
+                    }
+                }
             }
             // Shift focus in different widgets
             KeyCode::Tab => {
                 // TODO: do nothing now, we will support the results list selection for it.
             }
+            KeyCode::Up => {
+                if !self.ui.is_focus_now {
+                    if app.is_first_selected() {
+                        app.unselect();
+                        self.ui.is_focus_now = true;
+                    } else {
+                        app.select_previous();
+                    }
+                }
+            }
+            KeyCode::Down => {
+                if self.ui.is_focus_now && app.query_results.try_read().is_ok_and(|x| x.number > 0)
+                {
+                    app.select_first();
+                    self.ui.is_focus_now = false;
+                } else {
+                    if app.is_selected() {
+                        app.select_next();
+                    } else {
+                        app.select_first();
+                    }
+                }
+            }
             // Other handlers passthrough to tui-textarea
-            _ => ui::key_map_for_textarea(key_event.into(), &mut self.ui.textarea),
+            _ => {
+                if self.ui.is_focus_now {
+                    ui::key_map_for_textarea(key_event.into(), &mut self.ui.textarea);
+                }
+            }
         }
         Ok(())
     }

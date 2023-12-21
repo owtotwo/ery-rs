@@ -34,6 +34,7 @@ impl Default for Query {
 #[derive(Debug, Default)]
 pub struct QueryResults {
     pub search: OsString,
+    pub offset: u32,
     pub number: u32,
     pub total: u32,
     pub request_flags: RequestFlags,

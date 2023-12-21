@@ -1,8 +1,8 @@
 use ratatui::{
     layout::{Constraint, Direction, Layout},
     style::{Color, Style, Stylize},
-    text::{Line, Span, Text},
-    widgets::{Block, BorderType, Borders, Paragraph},
+    text::{Line, Span},
+    widgets::{Block, BorderType, Borders, List, ListItem},
     Frame,
 };
 use tui_textarea::{CursorMove, Input, Key, TextArea};
@@ -29,14 +29,21 @@ const GRAY_COLOR: Color = TERM_GRAY_COLOR;
 #[derive(Debug)]
 pub struct UI<'a> {
     pub textarea: TextArea<'a>,
+    pub is_focus_now: bool,
+    cursor_style: Style,
 }
 
 impl UI<'_> {
     pub fn new() -> Self {
         // let mut textarea = TextArea::new(vec!["♿😊☺".to_string()]);
         // textarea.move_cursor(CursorMove::End);
+        let textarea = TextArea::new(vec![]);
+        let cursor_style = textarea.cursor_style();
+        let is_focus_now = true;
         UI {
-            textarea: Default::default(),
+            textarea,
+            is_focus_now,
+            cursor_style,
         }
     }
 
@@ -48,6 +55,12 @@ impl UI<'_> {
 
         self.textarea.set_style(Style::default().fg(FONT_COLOR));
         self.textarea.set_cursor_line_style(Style::default());
+        if self.is_focus_now {
+            self.textarea.set_cursor_style(self.cursor_style);
+        } else {
+            self.textarea
+                .set_cursor_style(self.textarea.cursor_line_style());
+        }
         self.textarea.set_block(
             Block::default()
                 .style(Style::default().fg(MAIN_COLOR))
@@ -59,7 +72,6 @@ impl UI<'_> {
 
         frame.render_widget(widget, chunks[0]);
 
-        let tui_show_max_len = chunks[1].height;
         let results = app.query_results.read().unwrap();
 
         let (num, total) = (results.number, results.total);
@@ -79,12 +91,11 @@ impl UI<'_> {
             .style(Style::default().fg(MAIN_COLOR))
             .borders(Borders::ALL);
 
-        let lines: Vec<Line> = results
+        let items: Vec<ListItem> = results
             .entrys
             .iter()
-            .take(tui_show_max_len as usize)
             .map(|entry| {
-                Line::from(vec![
+                ListItem::new(vec![Line::from(vec![
                     Span::styled(
                         if entry.is_folder { "📁 " } else { "📄 " },
                         Style::default().fg(GRAY_COLOR),
@@ -98,14 +109,17 @@ impl UI<'_> {
                         format!("{}", entry.path.as_ref().unwrap().display()),
                         Style::default().italic().fg(GRAY_COLOR),
                     ),
-                ])
+                ])])
             })
             .collect();
-        let text: Text<'_> = Text::from(lines);
 
-        let paragraph = Paragraph::new(text).block(block).style(Style::default());
+        let list = List::new(items)
+            .block(block)
+            .highlight_style(Style::default().fg(Color::Indexed(220)));
+        // .highlight_style(Style::default().underlined());
+        // .highlight_style(Style::default().fg(Color::Rgb(255, 169, 0)));
 
-        frame.render_widget(paragraph, chunks[1]);
+        frame.render_stateful_widget(list, chunks[1], &mut app.list_state);
     }
 
     pub fn set_search_text(&mut self, text: &str) {
