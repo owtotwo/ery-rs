@@ -1,13 +1,11 @@
 mod ery;
 
 use std::{
-    cmp::min,
     sync::{mpsc, Arc, Mutex, RwLock},
     thread,
 };
 
 use everything_sdk::global;
-use ratatui::widgets::ListState;
 
 use crate::tui::Event;
 
@@ -23,7 +21,6 @@ pub struct App {
     pub back_recevier: Arc<Mutex<mpsc::Receiver<QueryResults>>>,
     /// query back results
     pub query_results: Arc<RwLock<QueryResults>>,
-    pub list_state: ListState,
 }
 
 impl App {
@@ -74,7 +71,6 @@ impl App {
             query_sender,
             back_recevier,
             query_results: Default::default(),
-            list_state: ListState::default().with_offset(0).with_selected(None),
         }
     }
 
@@ -86,7 +82,7 @@ impl App {
             match_case: false,
             match_whole_word: false,
             regex: false,
-            max: 64, // TODO: limit for now
+            max: 512, // TODO: limit for now
             offset: 0,
             sort_type: Default::default(),
             request_flags: Default::default(),
@@ -104,50 +100,5 @@ impl App {
             }
         });
         Ok(())
-    }
-
-    pub fn is_selected(&self) -> bool {
-        self.list_state.selected().is_some()
-    }
-
-    pub fn is_first_selected(&self) -> bool {
-        self.list_state.selected().is_some_and(|i| i == 0)
-    }
-
-    pub fn select_first(&mut self) {
-        if let Ok(results) = self.query_results.try_read() {
-            if results.number > 0 {
-                self.list_state.select(Some(0));
-            }
-        }
-    }
-
-    pub fn select_previous(&mut self) {
-        if let Ok(results) = self.query_results.try_read() {
-            if results.number > 0 {
-                let last = (results.number - 1) as usize;
-                self.list_state.select(
-                    self.list_state
-                        .selected()
-                        .and_then(|i| Some(min(last, i.saturating_sub(1)))),
-                );
-            }
-        }
-    }
-
-    pub fn select_next(&mut self) {
-        if let Ok(results) = self.query_results.try_read() {
-            if results.number > 0 {
-                let last = (results.number - 1) as usize;
-                self.list_state.select(
-                    self.list_state
-                        .selected()
-                        .and_then(|i| Some(min(last, i.saturating_add(1)))),
-                );
-            }
-        };
-    }
-    pub fn unselect(&mut self) {
-        self.list_state.select(None);
     }
 }

@@ -17,7 +17,6 @@ use std::time::{Duration, Instant};
 use std::{io, thread};
 
 use crossterm::event::{self, Event as CrosstermEvent};
-use tui_textarea::CursorMove;
 
 use anyhow::Result;
 
@@ -169,13 +168,15 @@ impl<B: Backend> Tui<'_, B> {
         Ok(())
     }
 
-    pub fn handle_mouse_events(&mut self, mouse_event: MouseEvent, _app: &mut App) -> Result<()> {
+    pub fn handle_mouse_events(&mut self, mouse_event: MouseEvent, app: &mut App) -> Result<()> {
         match mouse_event.kind {
-            MouseEventKind::Down(MouseButton::Left) | MouseEventKind::ScrollUp => {
-                self.ui.textarea.move_cursor(CursorMove::Back);
+            MouseEventKind::Down(MouseButton::Left) => {}
+            MouseEventKind::Down(MouseButton::Right) => {}
+            MouseEventKind::ScrollUp => {
+                self.up(app)?;
             }
-            MouseEventKind::Down(MouseButton::Right) | MouseEventKind::ScrollDown => {
-                self.ui.textarea.move_cursor(CursorMove::Forward);
+            MouseEventKind::ScrollDown => {
+                self.down(app)?;
             }
             _ => {}
         }
@@ -190,11 +191,11 @@ impl<B: Backend> Tui<'_, B> {
         match key_event.code {
             // Quit application on `Esc`
             KeyCode::Esc => {
-                if self.ui.is_focus_now {
+                if self.ui.is_focus_search_bar {
                     self.quit();
                 } else {
-                    app.unselect();
-                    self.ui.is_focus_now = true;
+                    // self.ui.unselect();
+                    self.ui.is_focus_search_bar = true;
                 }
             }
             // Quit application on `Ctrl+C`
@@ -205,7 +206,7 @@ impl<B: Backend> Tui<'_, B> {
             }
             // Do query on `Enter`
             KeyCode::Enter => {
-                if self.ui.is_focus_now {
+                if self.ui.is_focus_search_bar {
                     let s = self.ui.textarea.lines()[0].as_str();
                     let is_query_already = if let Ok(results) = app.query_results.try_read() {
                         results.search == OsString::from_str(s).unwrap()
@@ -213,46 +214,105 @@ impl<B: Backend> Tui<'_, B> {
                         false
                     };
                     if is_query_already {
-                        app.select_first();
-                        self.ui.is_focus_now = false;
+                        self.ui.select_first(app);
+                        self.ui.is_focus_search_bar = false;
                     } else {
                         app.send_query(s)?;
+                        self.ui.unselect();
                     }
                 }
+            }
+            KeyCode::Backspace if !self.ui.is_focus_search_bar => {
+                self.ui.is_focus_search_bar = true;
             }
             // Shift focus in different widgets
             KeyCode::Tab => {
                 // TODO: do nothing now, we will support the results list selection for it.
+                if self.ui.is_focus_search_bar {
+                    self.ui.is_focus_search_bar = false;
+                    if !self.ui.is_selected() {
+                        self.ui.select_first(app);
+                    }
+                } else {
+                    self.ui.is_focus_search_bar = true;
+                }
             }
             KeyCode::Up => {
-                if !self.ui.is_focus_now {
-                    if app.is_first_selected() {
-                        app.unselect();
-                        self.ui.is_focus_now = true;
-                    } else {
-                        app.select_previous();
-                    }
-                }
+                self.up(app)?;
             }
             KeyCode::Down => {
-                if self.ui.is_focus_now && app.query_results.try_read().is_ok_and(|x| x.number > 0)
-                {
-                    app.select_first();
-                    self.ui.is_focus_now = false;
-                } else {
-                    if app.is_selected() {
-                        app.select_next();
-                    } else {
-                        app.select_first();
-                    }
-                }
+                self.down(app)?;
+            }
+            KeyCode::PageUp => {
+                self.page_up(app)?;
+            }
+            KeyCode::PageDown => {
+                self.page_down(app)?;
             }
             // Other handlers passthrough to tui-textarea
             _ => {
-                if self.ui.is_focus_now {
+                if self.ui.is_focus_search_bar {
                     ui::key_map_for_textarea(key_event.into(), &mut self.ui.textarea);
                 }
             }
+        }
+        Ok(())
+    }
+
+    fn up(&mut self, app: &mut App) -> Result<()> {
+        if !self.ui.is_focus_search_bar {
+            if self.ui.is_first_selected() {
+                self.ui.unselect();
+                self.ui.is_focus_search_bar = true;
+            } else {
+                self.ui.select_previous_n(1, app);
+            }
+        }
+        Ok(())
+    }
+
+    fn down(&mut self, app: &mut App) -> Result<()> {
+        if self.ui.is_focus_search_bar && app.query_results.try_read().is_ok_and(|x| x.number > 0) {
+            self.ui.select_first(app);
+            self.ui.is_focus_search_bar = false;
+        } else {
+            if self.ui.is_selected() {
+                self.ui.select_next_n(1, app);
+            } else {
+                self.ui.select_first(app);
+            }
+        }
+        Ok(())
+    }
+
+    fn page_up(&mut self, app: &mut App) -> Result<()> {
+        if !self.ui.is_focus_search_bar {
+            self.ui.select_previous_page(app);
+            // let old_offset = self.ui.list_state.offset();
+            // let page_offset = self.ui.last_page_height.unwrap() as usize;
+            // let new_offset = old_offset.saturating_sub(page_offset);
+            // *self.ui.list_state.offset_mut() = new_offset;
+            // if new_offset == old_offset {
+            //     self.ui.select_first(app);
+            // } else {
+            //     self.ui.select_previous_n(old_offset - new_offset, app);
+            // }
+        }
+        Ok(())
+    }
+
+    fn page_down(&mut self, app: &mut App) -> Result<()> {
+        if !self.ui.is_focus_search_bar {
+            self.ui.select_next_page(app);
+            // let old_offset = self.ui.list_state.offset();
+            // let page_offset = self.ui.last_page_height.unwrap() as usize;
+            // let new_offset = old_offset.saturating_add(page_offset);
+            // *self.ui.list_state.offset_mut() = new_offset;
+            // if new_offset == old_offset {
+            //     self.ui.select_last(app);
+            // } else {
+            //     self.ui.select_next_n(new_offset - old_offset, app);
+            // }
         }
         Ok(())
     }

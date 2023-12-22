@@ -1,8 +1,10 @@
+use std::cmp::min;
+
 use ratatui::{
-    layout::{Constraint, Direction, Layout},
+    layout::{Constraint, Direction, Layout, Margin},
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, List, ListItem},
+    widgets::{Block, BorderType, Borders, List, ListItem, ListState},
     Frame,
 };
 use tui_textarea::{CursorMove, Input, Key, TextArea};
@@ -29,8 +31,10 @@ const GRAY_COLOR: Color = TERM_GRAY_COLOR;
 #[derive(Debug)]
 pub struct UI<'a> {
     pub textarea: TextArea<'a>,
-    pub is_focus_now: bool,
+    pub is_focus_search_bar: bool,
     cursor_style: Style,
+    pub list_state: ListState,
+    pub last_page_height: Option<u16>,
 }
 
 impl UI<'_> {
@@ -40,10 +44,13 @@ impl UI<'_> {
         let textarea = TextArea::new(vec![]);
         let cursor_style = textarea.cursor_style();
         let is_focus_now = true;
+        let list_state = ListState::default().with_offset(0).with_selected(None);
         UI {
             textarea,
-            is_focus_now,
+            is_focus_search_bar: is_focus_now,
             cursor_style,
+            list_state,
+            last_page_height: None,
         }
     }
 
@@ -53,9 +60,18 @@ impl UI<'_> {
             .constraints([Constraint::Length(3), Constraint::Min(1)])
             .split(frame.size());
 
+        self.last_page_height = Some(
+            chunks[1]
+                .inner(&Margin {
+                    vertical: 1,
+                    horizontal: 1,
+                })
+                .height,
+        );
+
         self.textarea.set_style(Style::default().fg(FONT_COLOR));
         self.textarea.set_cursor_line_style(Style::default());
-        if self.is_focus_now {
+        if self.is_focus_search_bar {
             self.textarea.set_cursor_style(self.cursor_style);
         } else {
             self.textarea
@@ -77,10 +93,12 @@ impl UI<'_> {
         let (num, total) = (results.number, results.total);
         assert!(num <= total);
 
+        let offset = self.list_state.offset();
+        let selected = self.list_state.selected();
         let block = Block::new()
             .title(vec![
                 Span::styled(
-                    format!("Total Results: {total}"),
+                    format!("Total Results: {total} (Offset: {offset} Selected: {selected:?})"),
                     Style::default().fg(if num > 0 { MAIN_COLOR } else { GRAY_COLOR }),
                 ),
                 Span::styled(
@@ -113,13 +131,19 @@ impl UI<'_> {
             })
             .collect();
 
-        let list = List::new(items)
-            .block(block)
-            .highlight_style(Style::default().fg(Color::Indexed(220)));
+        let list = if self.is_focus_search_bar {
+            List::new(items).block(block)
+        } else {
+            List::new(items)
+                .block(block)
+                .highlight_style(Style::default().fg(Color::Indexed(220)))
+        };
+
+        // let list = list;
         // .highlight_style(Style::default().underlined());
         // .highlight_style(Style::default().fg(Color::Rgb(255, 169, 0)));
 
-        frame.render_stateful_widget(list, chunks[1], &mut app.list_state);
+        frame.render_stateful_widget(list, chunks[1], &mut self.list_state);
     }
 
     pub fn set_search_text(&mut self, text: &str) {
@@ -128,6 +152,120 @@ impl UI<'_> {
         self.textarea.select_all();
         self.textarea.paste();
         self.textarea.set_yank_text(old_yank);
+    }
+
+    pub fn is_selected(&self) -> bool {
+        self.list_state.selected().is_some()
+    }
+
+    pub fn is_first_selected(&self) -> bool {
+        self.list_state.selected().is_some_and(|i| i == 0)
+    }
+
+    pub fn select_first(&mut self, app: &mut App) {
+        if let Ok(results) = app.query_results.try_read() {
+            if results.number > 0 {
+                self.list_state.select(Some(0));
+            }
+        }
+    }
+
+    pub fn select_last(&mut self, app: &mut App) {
+        if let Ok(results) = app.query_results.try_read() {
+            if results.number > 0 {
+                self.list_state.select(Some(results.number as usize - 1));
+            }
+        }
+    }
+
+    pub fn select_previous_n(&mut self, n: usize, app: &mut App) {
+        if let Ok(results) = app.query_results.try_read() {
+            if results.number > 0 {
+                let last = (results.number - 1) as usize;
+                self.list_state.select(
+                    self.list_state
+                        .selected()
+                        .and_then(|i| Some(min(last, i.saturating_sub(n)))),
+                );
+            }
+        }
+    }
+
+    pub fn select_next_n(&mut self, n: usize, app: &mut App) {
+        if let Ok(results) = app.query_results.try_read() {
+            if results.number > 0 {
+                let last = (results.number - 1) as usize;
+                self.list_state.select(
+                    self.list_state
+                        .selected()
+                        .and_then(|i| Some(min(last, i.saturating_add(n)))),
+                );
+            }
+        };
+    }
+
+    pub fn is_first_page(&self) -> bool {
+        self.list_state.offset() == 0
+    }
+
+    pub fn is_last_page(&self, results_number: u32) -> bool {
+        let page_height = self.last_page_height.unwrap() as u32;
+        if results_number <= page_height {
+            true
+        } else {
+            let offset = self.list_state.offset();
+            (results_number - offset as u32) <= page_height
+        }
+    }
+
+    pub fn select_next_page(&mut self, app: &mut App) {
+        if let Ok(results) = app.query_results.try_read() {
+            if results.number > 0 {
+                if self.is_last_page(results.number) {
+                    self.list_state.select(Some(results.number as usize - 1));
+                } else {
+                    let old_offset = self.list_state.offset();
+                    let page_height = self.last_page_height.unwrap() as usize;
+                    let new_offset = old_offset.saturating_add(page_height);
+                    *self.list_state.offset_mut() = new_offset;
+
+                    let n = new_offset - old_offset;
+                    let last = (results.number - 1) as usize;
+                    self.list_state.select(
+                        self.list_state
+                            .selected()
+                            .and_then(|i| Some(min(last, i.saturating_add(n)))),
+                    );
+                }
+            }
+        };
+    }
+
+    pub fn select_previous_page(&mut self, app: &mut App) {
+        if let Ok(results) = app.query_results.try_read() {
+            if results.number > 0 {
+                if self.is_first_page() {
+                    self.list_state.select(Some(0));
+                } else {
+                    let old_offset = self.list_state.offset();
+                    let page_height = self.last_page_height.unwrap() as usize;
+                    let new_offset = old_offset.saturating_sub(page_height);
+                    *self.list_state.offset_mut() = new_offset;
+
+                    let n = old_offset - new_offset;
+                    let last = (results.number - 1) as usize;
+                    self.list_state.select(
+                        self.list_state
+                            .selected()
+                            .and_then(|i| Some(min(last, i.saturating_sub(n)))),
+                    );
+                }
+            }
+        };
+    }
+
+    pub fn unselect(&mut self) {
+        self.list_state.select(None);
     }
 }
 

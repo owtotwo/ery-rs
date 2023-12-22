@@ -3,7 +3,7 @@ name = "ery"
 
 [package]
 name = "ery"
-version = "0.0.3"
+version = "0.0.4"
 authors = ["owtotwo <owtotwo@163.com>"]
 license = "GPL-3.0-or-later"
 edition = "2021"
