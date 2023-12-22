@@ -9,7 +9,7 @@ use crossterm::event::{KeyEvent, MouseEvent};
 use crossterm::terminal::{self, EnterAlternateScreen, LeaveAlternateScreen};
 use ratatui::backend::Backend;
 use ratatui::Terminal;
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::panic;
 use std::str::FromStr;
 use std::sync::mpsc;
@@ -219,6 +219,22 @@ impl<B: Backend> Tui<'_, B> {
                     } else {
                         app.send_query(s)?;
                         self.ui.unselect();
+                    }
+                } else {
+                    if self.ui.is_selected() {
+                        if let Some(path) = self.ui.get_selected_full_path(app) {
+                            let mut cmd = std::process::Command::new("explorer");
+                            // Ctrl+Enter will open the folder and select the file, if it is.
+                            if key_event.modifiers == KeyModifiers::CONTROL && path.is_file() {
+                                // Ref: https://stackoverflow.com/a/13625225
+                                cmd.arg(OsStr::new("/select,"));
+                            }
+                            cmd.arg(path.as_os_str());
+                            cmd.spawn()
+                                .expect("explorer command failed to start")
+                                .wait()
+                                .expect("failed to wait");
+                        }
                     }
                 }
             }

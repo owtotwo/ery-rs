@@ -82,7 +82,7 @@ impl App {
             match_case: false,
             match_whole_word: false,
             regex: false,
-            max: 512, // TODO: limit for now
+            max: 512, // TODO: limit for now, maybe dynamic loading in the future.
             offset: 0,
             sort_type: Default::default(),
             request_flags: Default::default(),

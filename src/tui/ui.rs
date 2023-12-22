@@ -1,4 +1,4 @@
-use std::cmp::min;
+use std::{cmp::min, path::PathBuf};
 
 use ratatui::{
     layout::{Constraint, Direction, Layout, Margin},
@@ -93,6 +93,14 @@ impl UI<'_> {
         let (num, total) = (results.number, results.total);
         assert!(num <= total);
 
+        // ////
+        // let show_path = self
+        //     .list_state
+        //     .selected()
+        //     .and_then(|index| results.entrys.get(index))
+        //     .and_then(|entry| entry.filepath.clone());
+        // ////
+
         let offset = self.list_state.offset();
         let selected = self.list_state.selected();
         let block = Block::new()
@@ -103,6 +111,7 @@ impl UI<'_> {
                 ),
                 Span::styled(
                     format!("『{}』", results.search.to_string_lossy()),
+                    // format!("『{:?}』", show_path),
                     Style::default().fg(GRAY_COLOR),
                 ),
             ])
@@ -170,7 +179,7 @@ impl UI<'_> {
         }
     }
 
-    pub fn select_last(&mut self, app: &mut App) {
+    pub fn _select_last(&mut self, app: &mut App) {
         if let Ok(results) = app.query_results.try_read() {
             if results.number > 0 {
                 self.list_state.select(Some(results.number as usize - 1));
@@ -266,6 +275,16 @@ impl UI<'_> {
 
     pub fn unselect(&mut self) {
         self.list_state.select(None);
+    }
+
+    pub fn get_selected_full_path(&self, app: &App) -> Option<PathBuf> {
+        let index = self.list_state.selected()?;
+        if let Ok(results) = app.query_results.read() {
+            let entry = results.entrys.get(index)?;
+            entry.filepath.clone()
+        } else {
+            None
+        }
     }
 }
 

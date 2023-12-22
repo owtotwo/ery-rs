@@ -50,6 +50,7 @@ pub struct QueryEntry {
     pub is_file: bool,
     pub filename: Option<OsString>,
     pub path: Option<PathBuf>,
+    pub filepath: Option<PathBuf>,
     pub full_path_name: Option<PathBuf>,
     pub extension: Option<OsString>,
     pub size: Option<u64>,
@@ -78,6 +79,11 @@ pub fn item_to_entry(item: EverythingItem<'_>, request_flags: RequestFlags) -> Q
     let path = request_flags
         .contains(RequestFlags::EVERYTHING_REQUEST_PATH)
         .then(|| item.path().unwrap());
+    let filepath = request_flags
+        .contains(
+            RequestFlags::EVERYTHING_REQUEST_PATH | RequestFlags::EVERYTHING_REQUEST_FILE_NAME,
+        )
+        .then(|| item.filepath().unwrap());
     let full_path_name = request_flags
         .contains(RequestFlags::EVERYTHING_REQUEST_FULL_PATH_AND_FILE_NAME)
         .then(|| item.full_path_name(None).unwrap());
@@ -128,6 +134,7 @@ pub fn item_to_entry(item: EverythingItem<'_>, request_flags: RequestFlags) -> Q
         is_file,
         filename,
         path,
+        filepath,
         full_path_name,
         extension,
         size,
