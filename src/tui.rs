@@ -191,12 +191,13 @@ impl<B: Backend> Tui<'_, B> {
         match key_event.code {
             // Quit application on `Esc`
             KeyCode::Esc => {
-                if self.ui.is_focus_search_bar {
-                    self.quit();
-                } else {
-                    // self.ui.unselect();
-                    self.ui.is_focus_search_bar = true;
-                }
+                self.quit();
+                // if self.ui.is_focus_search_bar {
+                //     self.quit();
+                // } else {
+                //     // self.ui.unselect();
+                //     self.ui.is_focus_search_bar = true;
+                // }
             }
             // Quit application on `Ctrl+C`
             KeyCode::Char('c') | KeyCode::Char('C')
@@ -241,6 +242,10 @@ impl<B: Backend> Tui<'_, B> {
             KeyCode::Backspace if !self.ui.is_focus_search_bar => {
                 self.ui.is_focus_search_bar = true;
             }
+            KeyCode::Char('/') if !self.ui.is_focus_search_bar => {
+                self.ui.is_focus_search_bar = true;
+                self.ui.textarea.select_all();
+            }
             // Shift focus in different widgets
             KeyCode::Tab => {
                 // TODO: do nothing now, we will support the results list selection for it.
@@ -264,6 +269,9 @@ impl<B: Backend> Tui<'_, B> {
             }
             KeyCode::PageDown => {
                 self.page_down(app)?;
+            }
+            KeyCode::Char('.') if key_event.modifiers == KeyModifiers::CONTROL => {
+                self.ui.is_popup_show = !self.ui.is_popup_show;
             }
             // Other handlers passthrough to tui-textarea
             _ => {

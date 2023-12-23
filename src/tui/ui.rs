@@ -1,10 +1,10 @@
 use std::{cmp::min, path::PathBuf};
 
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Margin},
+    layout::{Constraint, Direction, Layout, Margin, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, List, ListItem, ListState},
+    widgets::{Block, BorderType, Borders, Clear, List, ListItem, ListState, Paragraph},
     Frame,
 };
 use tui_textarea::{CursorMove, Input, Key, TextArea};
@@ -28,6 +28,11 @@ const _DARK_GRAY_COLOR: Color = Color::DarkGray;
 const TERM_GRAY_COLOR: Color = Color::Indexed(8);
 const GRAY_COLOR: Color = TERM_GRAY_COLOR;
 
+const _LIGHT_MAIN_COLOR_8_BIT: Color = Color::Indexed(220);
+const _LIGHT_MAIN_COLOR: Color = _LIGHT_MAIN_COLOR_8_BIT;
+const LIGHT_FONT_COLOR_8_BIT: Color = Color::Indexed(214);
+const LIGHT_FONT_COLOR: Color = LIGHT_FONT_COLOR_8_BIT;
+
 #[derive(Debug)]
 pub struct UI<'a> {
     pub textarea: TextArea<'a>,
@@ -35,6 +40,7 @@ pub struct UI<'a> {
     cursor_style: Style,
     pub list_state: ListState,
     pub last_page_height: Option<u16>,
+    pub is_popup_show: bool,
 }
 
 impl UI<'_> {
@@ -43,14 +49,14 @@ impl UI<'_> {
         // textarea.move_cursor(CursorMove::End);
         let textarea = TextArea::new(vec![]);
         let cursor_style = textarea.cursor_style();
-        let is_focus_now = true;
         let list_state = ListState::default().with_offset(0).with_selected(None);
         UI {
             textarea,
-            is_focus_search_bar: is_focus_now,
+            is_focus_search_bar: true,
             cursor_style,
             list_state,
             last_page_height: None,
+            is_popup_show: false,
         }
     }
 
@@ -145,7 +151,7 @@ impl UI<'_> {
         } else {
             List::new(items)
                 .block(block)
-                .highlight_style(Style::default().fg(Color::Indexed(220)))
+                .highlight_style(Style::default().fg(LIGHT_FONT_COLOR))
         };
 
         // let list = list;
@@ -153,6 +159,60 @@ impl UI<'_> {
         // .highlight_style(Style::default().fg(Color::Rgb(255, 169, 0)));
 
         frame.render_stateful_widget(list, chunks[1], &mut self.list_state);
+
+        if self.is_popup_show {
+            let popup_block = Block::new()
+                .title(vec![Span::styled(
+                    format!("Everything Status (ctrl+.)"),
+                    Style::default().fg(MAIN_COLOR),
+                )])
+                .style(Style::default().fg(MAIN_COLOR))
+                .borders(Borders::ALL);
+
+            let (major, minor, revision, build) = app.status.version;
+
+            let text: Vec<Line<'_>> = [
+                format!(" Version: {major}.{minor}.{revision}.{build}"),
+                format!(" Admin: {}", yes_or_no(app.status.is_admin)),
+                format!(" AppData: {}", yes_or_no(app.status.is_appdata)),
+                format!(" Indexed: "),
+                format!(
+                    " - File Size: {} {}",
+                    yes_or_no(app.status.is_file_size_indexed),
+                    is_fast_sort(app.status.is_size_fast_sort),
+                ),
+                format!(
+                    " - Folder Size: {} {}",
+                    yes_or_no(app.status.is_folder_size_indexed),
+                    is_fast_sort(app.status.is_size_fast_sort),
+                ),
+                format!(
+                    " - Date Modified: {} {}",
+                    yes_or_no(app.status.is_date_modified_indexed),
+                    is_fast_sort(app.status.is_date_modified_fast_sort),
+                ),
+                format!(
+                    " - Date Created: {} {}",
+                    yes_or_no(app.status.is_date_created_indexed),
+                    is_fast_sort(app.status.is_date_created_fast_sort),
+                ),
+                format!(
+                    " - Date Accessed: {} {}",
+                    yes_or_no(app.status.is_date_accessed_indexed),
+                    is_fast_sort(app.status.is_date_accessed_fast_sort),
+                ),
+            ]
+            .map(|s| Line::from(s))
+            .into();
+
+            let paragraph = Paragraph::new(text)
+                .style(Style::default().fg(FONT_COLOR))
+                .block(popup_block);
+
+            let popup_area = centered_rect(frame.size(), 80, 60);
+            frame.render_widget(Clear, popup_area);
+            frame.render_widget(paragraph, popup_area);
+        }
     }
 
     pub fn set_search_text(&mut self, text: &str) {
@@ -285,6 +345,52 @@ impl UI<'_> {
         } else {
             None
         }
+    }
+}
+
+fn centered_rect(r: Rect, percent_x: u16, percent_y: u16) -> Rect {
+    let popup_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage((100 - percent_y) / 2),
+            Constraint::Percentage(percent_y),
+            Constraint::Percentage((100 - percent_y) / 2),
+        ])
+        .split(r);
+
+    Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage((100 - percent_x) / 2),
+            Constraint::Percentage(percent_x),
+            Constraint::Percentage((100 - percent_x) / 2),
+        ])
+        .split(popup_layout[1])[1]
+}
+
+fn yes_or_no(b: bool) -> char {
+    if b {
+        // '🆗'
+        // '🙆'
+        // '👍'
+        // '👌'
+        // '✅'
+        '🟢'
+        // '🟠'
+    } else {
+        // '❎'
+        // '⬜'
+        // '🙅'
+        // '🔴'
+        '🟤'
+    }
+}
+
+fn is_fast_sort(b: bool) -> &'static str {
+    if b {
+        "(fast sort)"
+    } else {
+        ""
     }
 }
 
