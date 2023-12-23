@@ -270,7 +270,9 @@ impl<B: Backend> Tui<'_, B> {
             KeyCode::PageDown => {
                 self.page_down(app)?;
             }
-            KeyCode::Char('.') if key_event.modifiers == KeyModifiers::CONTROL => {
+            KeyCode::Char('.') | KeyCode::Char('d') | KeyCode::Char('D')
+                if key_event.modifiers == KeyModifiers::CONTROL =>
+            {
                 self.ui.is_popup_show = !self.ui.is_popup_show;
             }
             // Other handlers passthrough to tui-textarea

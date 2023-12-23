@@ -201,6 +201,11 @@ impl UI<'_> {
                     yes_or_no(app.status.is_date_accessed_indexed),
                     is_fast_sort(app.status.is_date_accessed_fast_sort),
                 ),
+                format!(
+                    " - Attritubes: {} {}",
+                    yes_or_no(app.status.is_attributes_indexed),
+                    is_fast_sort(app.status.is_attributes_fast_sort),
+                ),
             ]
             .map(|s| Line::from(s))
             .into();
