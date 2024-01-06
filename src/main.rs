@@ -9,13 +9,13 @@ use std::io;
 #[command(author, version, about, long_about = None)]
 struct Cli {
     /// search text for Everything
-    text: Option<String>,
+    text: Option<Vec<String>>,
 }
 
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
-    let search_text: Option<&str> = cli.text.as_deref();
+    let search_text = cli.text.as_ref();
 
     let backend = CrosstermBackend::new(io::stdout());
     let terminal = Terminal::new(backend)?;
@@ -23,6 +23,7 @@ fn main() -> anyhow::Result<()> {
 
     let mut app = App::with_sender(tui.sender.clone());
     if let Some(text) = search_text {
+        let text = &text.join(" "); // multi params separated by spaces
         tui.set_search_text(text); // set search text from start
         app.send_query(text)?; // then search it automatically
     }
