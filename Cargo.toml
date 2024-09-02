@@ -16,10 +16,10 @@ keywords = ["everything", "terminal", "tui", "cli", "command-line"]
 
 
 [dependencies]
-crossterm = "0.27.0"
-ratatui = "0.25.0"
+crossterm = "0.28.1"
+ratatui = "0.28.1"
 anyhow = "1.0"
-tui-textarea = "0.4.0"
+tui-textarea = "0.6.1"
 everything-sdk = "0.0.6"
 clap = { version = "4.4.11", features = ["derive"] }
 

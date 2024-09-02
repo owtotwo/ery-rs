@@ -64,11 +64,11 @@ impl UI<'_> {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Length(3), Constraint::Min(1)])
-            .split(frame.size());
+            .split(frame.area());
 
         self.last_page_height = Some(
             chunks[1]
-                .inner(&Margin {
+                .inner(Margin {
                     vertical: 1,
                     horizontal: 1,
                 })
@@ -90,9 +90,8 @@ impl UI<'_> {
                 .border_type(BorderType::Rounded)
                 .title("Everything"),
         );
-        let widget = self.textarea.widget();
 
-        frame.render_widget(widget, chunks[0]);
+        frame.render_widget(&self.textarea, chunks[0]);
 
         let results = app.query_results.read().unwrap();
 
@@ -214,7 +213,7 @@ impl UI<'_> {
                 .style(Style::default().fg(FONT_COLOR))
                 .block(popup_block);
 
-            let popup_area = centered_rect(frame.size(), 80, 60);
+            let popup_area = centered_rect(frame.area(), 80, 60);
             frame.render_widget(Clear, popup_area);
             frame.render_widget(paragraph, popup_area);
         }

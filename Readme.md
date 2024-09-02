@@ -7,7 +7,7 @@
 
 ## Demo
 
-![demo.jpg](./demo.jpg)
+![demo.png](./demo.png)
 
 ## Why
 
